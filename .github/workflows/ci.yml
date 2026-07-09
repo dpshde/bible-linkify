@@ -11,13 +11,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm typecheck
       - run: pnpm build
+      # Regression: bin symlink must exit 1 on unlinked refs (npx path)
+      - name: CLI bin exit codes
+        run: |
+          set -e
+          echo 'John 3:16' > dirty.md
+          echo '[John 3:16](https://route.bible/jhn.3.16)' > clean.md
+          node dist/cli.js --check dirty.md; test $? -eq 1
+          # Simulate npm .bin symlink
+          ln -sf "$(pwd)/dist/cli.js" ./bible-linkify-bin
+          ./bible-linkify-bin --check dirty.md; test $? -eq 1
+          ./bible-linkify-bin --check clean.md; test $? -eq 0
