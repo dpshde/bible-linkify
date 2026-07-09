@@ -1,0 +1,76 @@
+{
+  "name": "bible-linkify",
+  "version": "0.1.1",
+  "description": "Linkify unlinked Scripture references in Markdown to portable route.bible URLs. CLI + library for CI.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "bin": {
+    "bible-linkify": "dist/cli.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "action.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/cli.ts --format esm,cjs --dts --clean && node scripts/postbuild.mjs",
+    "check": "pnpm run typecheck && pnpm run test",
+    "dev": "tsx src/cli.ts",
+    "prepack": "pnpm run build && pnpm run typecheck && pnpm run test",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "grab-bcv": "^0.1.7",
+    "minimatch": "^10.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsup": "^8.5.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  },
+  "keywords": [
+    "bible",
+    "scripture",
+    "route.bible",
+    "markdown",
+    "linkify",
+    "github-action",
+    "grab-bcv",
+    "cli"
+  ],
+  "homepage": "https://github.com/dpshde/bible-linkify#readme",
+  "bugs": {
+    "url": "https://github.com/dpshde/bible-linkify/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dpshde/bible-linkify.git"
+  },
+  "funding": {
+    "type": "ko-fi",
+    "url": "https://ko-fi.com/dpshade"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}

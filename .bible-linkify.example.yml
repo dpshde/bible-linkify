@@ -1,0 +1,13 @@
+# Copy to the repo root as .bible-linkify.yml
+paths:
+  - "README.md"
+  - "docs/**/*.md"
+  - "**/*.mdx"
+exclude:
+  - "**/node_modules/**"
+  - "**/CHANGELOG.md"
+  - "**/dist/**"
+baseUrl: https://route.bible
+src: bible-linkify
+rewriteExisting: false
+detectTranslation: true

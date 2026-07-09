@@ -1,0 +1,99 @@
+name: Bible Linkify
+description: Linkify unlinked Scripture references in Markdown to portable route.bible URLs.
+author: Selah Tools / DPS Labs
+branding:
+  icon: book-open
+  color: purple
+
+inputs:
+  paths:
+    description: Space-separated file paths or globs to scan (passed to the CLI).
+    required: false
+    default: ""
+  mode:
+    description: "CLI mode: check | write | diff | report"
+    required: false
+    default: check
+  base_url:
+    description: route.bible origin (or compatible resolver).
+    required: false
+    default: https://route.bible
+  src:
+    description: Optional src= query tag appended to generated links.
+    required: false
+    default: ""
+  rewrite_existing:
+    description: If true, rewrite existing Markdown links whose label is a full passage.
+    required: false
+    default: "false"
+  config:
+    description: Optional path to .bible-linkify.yml
+    required: false
+    default: ""
+  working_directory:
+    description: Working directory for the scan (default repo root).
+    required: false
+    default: "."
+
+outputs:
+  exit_code:
+    description: Exit code from bible-linkify
+    value: ${{ steps.run.outputs.exit_code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install bible-linkify dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        if command -v pnpm >/dev/null 2>&1; then
+          pnpm install --frozen-lockfile=false
+          pnpm run build
+        else
+          npm install
+          npm run build
+        fi
+
+    - name: Run bible-linkify
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        set +e
+        ARGS=()
+        case "${{ inputs.mode }}" in
+          write) ARGS+=(--write) ;;
+          diff) ARGS+=(--diff) ;;
+          report) ARGS+=(--report) ;;
+          *) ARGS+=(--check) ;;
+        esac
+
+        if [ -n "${{ inputs.base_url }}" ]; then
+          ARGS+=(--base-url "${{ inputs.base_url }}")
+        fi
+        if [ -n "${{ inputs.src }}" ]; then
+          ARGS+=(--src "${{ inputs.src }}")
+        fi
+        if [ "${{ inputs.rewrite_existing }}" = "true" ]; then
+          ARGS+=(--rewrite-existing)
+        fi
+        if [ -n "${{ inputs.config }}" ]; then
+          ARGS+=(--config "${{ inputs.config }}")
+        fi
+
+        # shellcheck disable=SC2206
+        PATHS=( ${{ inputs.paths }} )
+        if [ ${#PATHS[@]} -gt 0 ] && [ -n "${PATHS[0]}" ]; then
+          ARGS+=("${PATHS[@]}")
+        fi
+
+        node "${{ github.action_path }}/dist/cli.js" "${ARGS[@]}"
+        CODE=$?
+        echo "exit_code=$CODE" >> "$GITHUB_OUTPUT"
+        exit $CODE
