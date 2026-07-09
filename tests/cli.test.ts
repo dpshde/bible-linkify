@@ -1,8 +1,10 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runCli } from "../src/cli";
+import { spawnSync } from "node:child_process";
+import { isDirectRun, runCli } from "../src/cli";
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "bible-linkify-"));
@@ -69,5 +71,60 @@ describe("runCli", () => {
     const payload = JSON.parse(logs.join(""));
     expect(payload.totalLinks).toBe(1);
     expect(payload.files[0].changes[0].canonical).toBe("PSA.23");
+  });
+});
+
+describe("isDirectRun", () => {
+  it("returns true for the real cli path and for a symlink to it", () => {
+    const dir = makeTempDir();
+    const realCli = resolve("dist/cli.js");
+    const linkPath = join(dir, "bible-linkify");
+    // build may not have run in pure unit test — skip if dist missing
+    try {
+      readFileSync(realCli);
+    } catch {
+      return;
+    }
+    symlinkSync(realCli, linkPath);
+    const moduleUrl = pathToFileURL(realCli).href;
+    expect(isDirectRun(realCli, moduleUrl)).toBe(true);
+    expect(isDirectRun(linkPath, moduleUrl)).toBe(true);
+    expect(isDirectRun(join(dir, "other.js"), moduleUrl)).toBe(false);
+  });
+});
+
+describe("spawned CLI exit codes", () => {
+  it("exits 1 via process when --check finds unlinked refs", () => {
+    const dir = makeTempDir();
+    writeFileSync(join(dir, "n.md"), "John 3:16\n", "utf8");
+    const cli = resolve("dist/cli.js");
+    try {
+      readFileSync(cli);
+    } catch {
+      return;
+    }
+    const result = spawnSync(process.execPath, [cli, "--check", "--cwd", dir, "n.md"], {
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout + result.stderr).toContain("John 3:16");
+  });
+
+  it("exits 1 when invoked through a bin-style symlink (npx simulation)", () => {
+    const dir = makeTempDir();
+    writeFileSync(join(dir, "n.md"), "Romans 8:28\n", "utf8");
+    const cli = resolve("dist/cli.js");
+    try {
+      readFileSync(cli);
+    } catch {
+      return;
+    }
+    const linkPath = join(dir, "bible-linkify");
+    symlinkSync(cli, linkPath);
+    const result = spawnSync(process.execPath, [linkPath, "--check", "--cwd", dir, "n.md"], {
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("Romans 8:28");
   });
 });

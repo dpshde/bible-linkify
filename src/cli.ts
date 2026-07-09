@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   defaultConfig,
   loadConfigFile,
@@ -27,7 +27,19 @@ type CliArgs = {
   quiet: boolean;
 };
 
-const VERSION = "0.1.0";
+function readPackageVersion(): string {
+  try {
+    // dist/cli.js → package root
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkgPath = join(here, "..", "package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+const VERSION = readPackageVersion();
 
 function printHelp(): void {
   process.stdout.write(`bible-linkify v${VERSION}
@@ -313,16 +325,25 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<nu
   return 0;
 }
 
-function isDirectRun(): boolean {
-  const entry = process.argv[1];
-  if (!entry) {
+/**
+ * True when this module is the process entrypoint.
+ * Must resolve npm/pnpm bin *symlinks* via realpath — otherwise `npx bible-linkify`
+ * never calls process.exit and --check always exits 0.
+ */
+export function isDirectRun(
+  entryPath: string | undefined = process.argv[1],
+  moduleUrl: string = import.meta.url,
+): boolean {
+  if (!entryPath) {
     return false;
   }
 
   try {
-    return import.meta.url === pathToFileURL(resolve(entry)).href;
+    const resolvedEntry = realpathSync(resolve(entryPath));
+    return moduleUrl === pathToFileURL(resolvedEntry).href;
   } catch {
-    return entry.endsWith("cli.ts") || entry.endsWith("cli.js");
+    const base = entryPath.replace(/\\/g, "/");
+    return /(^|\/)(bible-linkify|cli)(\.[cm]?[jt]s)?$/.test(base);
   }
 }
 
